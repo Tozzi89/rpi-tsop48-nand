@@ -20,6 +20,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -28,6 +29,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <time.h>
+#include <unistd.h>
 
 // #define DEBUG 1
 
@@ -61,7 +63,12 @@ int data_to_gpio_map[8] = { 23, 24, 25, 8, 7, 10, 9, 11 }; // 23 is NAND IO0, et
 
 volatile unsigned int *gpio;
 
-inline void INP_GPIO(int g)
+int read_id(unsigned char id[5]);
+int read_pages(int first_page_number, int number_of_pages, char *outfile, int write_spare);
+int write_pages(int first_page_number, int number_of_pages, char *infile);
+int erase_blocks(int first_block_number, int number_of_blocks);
+
+static inline __attribute__((always_inline)) void INP_GPIO(int g)
 {
 #ifdef DEBUG
 	printf("setting direction of GPIO#%d to input\n", g);
@@ -69,7 +76,7 @@ inline void INP_GPIO(int g)
 	(*(gpio+((g)/10)) &= ~(7<<(((g)%10)*3)));
 }
 
-inline void OUT_GPIO(int g)
+static inline __attribute__((always_inline)) void OUT_GPIO(int g)
 {
 	INP_GPIO(g);
 #ifdef DEBUG
@@ -78,7 +85,7 @@ inline void OUT_GPIO(int g)
 	*(gpio+((g)/10)) |= (1<<(((g)%10)*3));
 }
 
-inline void GPIO_SET_1(int g)
+static inline __attribute__((always_inline)) void GPIO_SET_1(int g)
 {
 #ifdef DEBUG
 	printf("setting GPIO#%d to 1\n", g);
@@ -86,7 +93,7 @@ inline void GPIO_SET_1(int g)
 	*(gpio +  7)  = 1 << g;
 }
 
-inline void GPIO_SET_0(int g)
+static inline __attribute__((always_inline)) void GPIO_SET_0(int g)
 {
 #ifdef DEBUG
 	printf("setting GPIO#%d to 0\n", g);
@@ -94,7 +101,7 @@ inline void GPIO_SET_0(int g)
 	*(gpio + 10)  = 1 << g;
 }
 
-inline int GPIO_READ(int g)
+static inline __attribute__((always_inline)) int GPIO_READ(int g)
 {
 	int x = (*(gpio + 13) & (1 << g)) >> g;
 #ifdef DEBUG
@@ -103,7 +110,7 @@ inline int GPIO_READ(int g)
 	return x;
 }
 
-inline void set_data_direction_in(void)
+static inline __attribute__((always_inline)) void set_data_direction_in(void)
 {
 	int i;
 #ifdef DEBUG
@@ -113,7 +120,7 @@ inline void set_data_direction_in(void)
 		INP_GPIO(data_to_gpio_map[i]);
 }
 
-inline void set_data_direction_out(void)
+static inline __attribute__((always_inline)) void set_data_direction_out(void)
 {
 	int i;
 #ifdef DEBUG
@@ -123,7 +130,7 @@ inline void set_data_direction_out(void)
 		OUT_GPIO(data_to_gpio_map[i]);
 }
 
-inline int GPIO_DATA8_IN(void)
+static inline __attribute__((always_inline)) int GPIO_DATA8_IN(void)
 {
 	int i, data;
 	for (i = data = 0; i < 8; i++, data = data << 1) {
@@ -136,7 +143,7 @@ inline int GPIO_DATA8_IN(void)
 	return data;
 }
 
-inline void GPIO_DATA8_OUT(int data)
+static inline __attribute__((always_inline)) void GPIO_DATA8_OUT(int data)
 {
 	int i;
 #ifdef DEBUG
@@ -460,7 +467,7 @@ int read_id(unsigned char id[5])
 	return 0;
 }
 
-inline int page_to_address(int page, int address_byte_index)
+static inline __attribute__((always_inline)) int page_to_address(int page, int address_byte_index)
 {
 	switch(address_byte_index) {
 	case 2:
