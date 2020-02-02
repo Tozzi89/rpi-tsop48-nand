@@ -158,10 +158,10 @@ static inline __attribute__((always_inline)) void GPIO_DATA8_OUT(int data)
 }
 
 int delay = 1;
-int shortpause()
+void shortpause()
 {
 	int i;
-	volatile static int dontcare = 0;
+	static volatile int dontcare = 0;
 	for (i = 0; i < delay; i++) {
 		dontcare++;
 	}
@@ -298,7 +298,7 @@ void print_id(unsigned char id[5])
 {
 	unsigned int i, bit, page_size, ras_size, orga, plane_number;
 	unsigned long block_size, plane_size, nand_size, nandras_size;
-	unsigned char maker[16], device[16], serial_access[20];
+	char maker[16], device[16], serial_access[20];
 	unsigned *thirdbits = (unsigned*)malloc(sizeof(unsigned) * 8);
 	unsigned *fourthbits = (unsigned*)malloc(sizeof(unsigned) * 8);
 	unsigned *fifthbits = (unsigned*)malloc(sizeof(unsigned) * 8);
@@ -410,19 +410,19 @@ void print_id(unsigned char id[5])
 
 	printf("\n");
 	printf("Page size:          %d bytes\n", page_size);
-	printf("Block size:         %d bytes\n", block_size);
+	printf("Block size:         %zd bytes\n", block_size);
 	printf("RAS (/512 bytes):   %d bytes\n", ras_size);
 	// printf("RAS (per page):  %d bytes\n", ras_size * page_size / 512);
 	// printf("RAS (per block): %d bytes\n", ras_size * block_size / 512);
 	printf("Organisation:       %d bit\n", orga);
 	printf("Serial access:      %s\n", serial_access);
-	printf("Number of planes:   %d\n", plane_number);
-	printf("Plane size:         %d bytes\n", plane_size);
+	printf("Number of planes:   %u\n", plane_number);
+	printf("Plane size:         %zd bytes\n", plane_size);
 	printf("\n");
-	printf("NAND size:          %d MB\n", nand_size / (1024 * 1024));
-	printf("NAND size + RAS:    %d MB\n", nandras_size / (1024 * 1024));
-	printf("Number of blocks:   %d\n", nand_size / block_size);
-	printf("Number of pages:    %d\n", nand_size / page_size);
+	printf("NAND size:          %zd MB\n", nand_size / (1024 * 1024));
+	printf("NAND size + RAS:    %zd MB\n", nandras_size / (1024 * 1024));
+	printf("Number of blocks:   %zd\n", nand_size / block_size);
+	printf("Number of pages:    %zd\n", nand_size / page_size);
 }
 
 int read_id(unsigned char id[5])
@@ -636,9 +636,7 @@ int send_eraseblock_command(int block)
 
 int read_status()
 {
-	int i, data;
-	unsigned char buf[5];
-
+	int data;
 	set_data_direction_out();
 
 	GPIO_SET_1(COMMAND_LATCH_ENABLE);
@@ -788,6 +786,7 @@ int read_pages(int first_page_number, int number_of_pages, char *outfile, int wr
 	//show cursor
 	// printf("\e[?25h");
 	// fflush(stdout) ;
+	return 0;
 }
 
 
@@ -933,11 +932,12 @@ int write_pages(int first_page_number, int number_of_pages, char *infile)
 	fcloseall();
 	clock_t end = clock();
 	printf("\nWrite done in %f seconds\n", (float)(end - start) / CLOCKS_PER_SEC);
+	return 0;
 }
 
 int erase_blocks(int first_block_number, int number_of_blocks)
 {
-	int block, block_no, block_nbr, percent, i, n, retry_count;
+	int block, block_nbr, percent, retry_count;
 	unsigned char id[5], id2[5];
 
 	if (read_id(id) < 0)
@@ -990,5 +990,5 @@ int erase_blocks(int first_block_number, int number_of_blocks)
 
 	clock_t end = clock();
 	printf("\nErasing done in %f seconds\n", (float)(end - start) / CLOCKS_PER_SEC);
-
+	return 0;
 }
