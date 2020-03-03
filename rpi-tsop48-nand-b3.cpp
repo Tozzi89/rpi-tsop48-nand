@@ -20,13 +20,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
@@ -37,13 +37,15 @@
 #define BLOCK_SIZE 135168 // (2K + 64)Byte
 #define MAX_WAIT_READ_BUSY	1000000
 
+#define PAGES_PER_BLOCK 64
+
 /* For Raspberry B+ :*/
-// #define BCM2708_PERI_BASE	0x20000000
-// #define GPIO_BASE	 	(BCM2708_PERI_BASE + 0x200000)
+#define BCM2708_PERI_BASE	0x20000000
+#define GPIO_BASE	 	(BCM2708_PERI_BASE + 0x200000)
 
 /* For Raspberry 2B and 3B :*/
-#define BCM2736_PERI_BASE        0x3F000000
-#define GPIO_BASE                (BCM2736_PERI_BASE + 0x200000) /* GPIO controller */
+//#define BCM2736_PERI_BASE        0x3F000000
+//#define GPIO_BASE                (BCM2736_PERI_BASE + 0x200000) /* GPIO controller */
 
 #define N_WRITE_PROTECT		2 // pulled up by RPi, this is useful
 #define N_READ_BUSY		3 // pulled up by RPi, this is also useful
@@ -59,16 +61,18 @@
 #define N_READ_ENABLE		18
 #define N_CHIP_ENABLE		22
 
+#define INLINE static inline __attribute__((always_inline))
+
 int data_to_gpio_map[8] = { 23, 24, 25, 8, 7, 10, 9, 11 }; // 23 is NAND IO0, etc.
 
 volatile unsigned int *gpio;
 
-int read_id(unsigned char id[5]);
-int read_pages(int first_page_number, int number_of_pages, char *outfile, int write_spare);
-int write_pages(int first_page_number, int number_of_pages, char *infile);
-int erase_blocks(int first_block_number, int number_of_blocks);
+INLINE int read_id(unsigned char id[5]);
+INLINE int read_pages(int first_page_number, int number_of_pages, char *outfile, int write_spare);
+INLINE int write_pages(int first_page_number, int number_of_pages, char *infile);
+INLINE int erase_blocks(int first_block_number, int number_of_blocks);
 
-static inline __attribute__((always_inline)) void INP_GPIO(int g)
+INLINE void INP_GPIO(int g)
 {
 #ifdef DEBUG
 	printf("setting direction of GPIO#%d to input\n", g);
@@ -76,7 +80,7 @@ static inline __attribute__((always_inline)) void INP_GPIO(int g)
 	(*(gpio+((g)/10)) &= ~(7<<(((g)%10)*3)));
 }
 
-static inline __attribute__((always_inline)) void OUT_GPIO(int g)
+INLINE void OUT_GPIO(int g)
 {
 	INP_GPIO(g);
 #ifdef DEBUG
@@ -85,7 +89,7 @@ static inline __attribute__((always_inline)) void OUT_GPIO(int g)
 	*(gpio+((g)/10)) |= (1<<(((g)%10)*3));
 }
 
-static inline __attribute__((always_inline)) void GPIO_SET_1(int g)
+INLINE void GPIO_SET_1(int g)
 {
 #ifdef DEBUG
 	printf("setting GPIO#%d to 1\n", g);
@@ -93,7 +97,7 @@ static inline __attribute__((always_inline)) void GPIO_SET_1(int g)
 	*(gpio +  7)  = 1 << g;
 }
 
-static inline __attribute__((always_inline)) void GPIO_SET_0(int g)
+INLINE void GPIO_SET_0(int g)
 {
 #ifdef DEBUG
 	printf("setting GPIO#%d to 0\n", g);
@@ -101,7 +105,7 @@ static inline __attribute__((always_inline)) void GPIO_SET_0(int g)
 	*(gpio + 10)  = 1 << g;
 }
 
-static inline __attribute__((always_inline)) int GPIO_READ(int g)
+INLINE int GPIO_READ(int g)
 {
 	int x = (*(gpio + 13) & (1 << g)) >> g;
 #ifdef DEBUG
@@ -110,7 +114,7 @@ static inline __attribute__((always_inline)) int GPIO_READ(int g)
 	return x;
 }
 
-static inline __attribute__((always_inline)) void set_data_direction_in(void)
+INLINE void set_data_direction_in(void)
 {
 	int i;
 #ifdef DEBUG
@@ -120,7 +124,7 @@ static inline __attribute__((always_inline)) void set_data_direction_in(void)
 		INP_GPIO(data_to_gpio_map[i]);
 }
 
-static inline __attribute__((always_inline)) void set_data_direction_out(void)
+INLINE void set_data_direction_out(void)
 {
 	int i;
 #ifdef DEBUG
@@ -130,7 +134,7 @@ static inline __attribute__((always_inline)) void set_data_direction_out(void)
 		OUT_GPIO(data_to_gpio_map[i]);
 }
 
-static inline __attribute__((always_inline)) int GPIO_DATA8_IN(void)
+INLINE int GPIO_DATA8_IN(void)
 {
 	int i, data;
 	for (i = data = 0; i < 8; i++, data = data << 1) {
@@ -143,7 +147,7 @@ static inline __attribute__((always_inline)) int GPIO_DATA8_IN(void)
 	return data;
 }
 
-static inline __attribute__((always_inline)) void GPIO_DATA8_OUT(int data)
+INLINE void GPIO_DATA8_OUT(int data)
 {
 	int i;
 #ifdef DEBUG
@@ -158,7 +162,7 @@ static inline __attribute__((always_inline)) void GPIO_DATA8_OUT(int data)
 }
 
 int delay = 1;
-void shortpause()
+INLINE void shortpause()
 {
 	int i;
 	static volatile int dontcare = 0;
@@ -167,13 +171,14 @@ void shortpause()
 	}
 }
 
-// void shortpause()
-// {
-//     struct timespec ts;
-//     ts.tv_sec = delay / 1000;
-//     ts.tv_nsec = (delay % 1000) * 1000000;
-//     nanosleep(&ts, NULL);
-// }
+/*
+INLINE void shortpause()
+{
+    struct timespec ts;
+    ts.tv_sec = delay / 1000;
+    ts.tv_nsec = (delay % 1000) * 1000000;
+    nanosleep(&ts, NULL);
+}*/
 
 int main(int argc, char **argv)
 { 
@@ -288,7 +293,7 @@ usage:
 	return 0;
 }
 
-void error_msg(char *msg)
+void error_msg(const char *msg)
 {
 	printf("%s\nBe sure to check wiring, and check that pressure is applied on both sides of 360 Clip\n" \
 		"sometimes it is required to move slightly the 360 Clip in case of a false contact\n", msg);
@@ -425,7 +430,7 @@ void print_id(unsigned char id[5])
 	printf("Number of pages:    %zd\n", nand_size / page_size);
 }
 
-int read_id(unsigned char id[5])
+INLINE int read_id(unsigned char id[5])
 {
 	int i;
 	unsigned char buf[5];
@@ -467,13 +472,16 @@ int read_id(unsigned char id[5])
 	return 0;
 }
 
-static inline __attribute__((always_inline)) int page_to_address(int page, int address_byte_index)
+INLINE int page_to_address(int page, int address_byte_index)
 {
 	switch(address_byte_index) {
+	//3rd: A12 A13 A14 A15 A16 A17 A18 A19
 	case 2:
 		return page & 0xff;
+	//4th: A20 A21 A22 A23 A24 A25 A26 A27
 	case 3:
 		return (page >>  8) & 0xff;
+	//5th: A28 A29 A30 L (1) L (1) L (1) L (1) L (1)
 	case 4:
 		return (page >> 16) & 0xff;
 	default:
@@ -481,7 +489,7 @@ static inline __attribute__((always_inline)) int page_to_address(int page, int a
 	}
 }
 
-int send_read_command(int page)
+INLINE int send_read_command(int page)
 {
 	int i;
 
@@ -533,7 +541,7 @@ int send_read_command(int page)
 	return 0;
 }
 
-int send_write_command(int page, unsigned char data[PAGE_SIZE])
+INLINE int send_write_command(int page, unsigned char data[PAGE_SIZE])
 {
 	int i;
 
@@ -588,22 +596,27 @@ int send_write_command(int page, unsigned char data[PAGE_SIZE])
 	return 0;
 }
 
+INLINE void write_cmd(uint8_t cmd){
+	GPIO_SET_1(COMMAND_LATCH_ENABLE); shortpause();
+	GPIO_SET_0(N_WRITE_ENABLE);	shortpause();
+
+	GPIO_DATA8_OUT(cmd); shortpause();
+	
+	GPIO_SET_1(N_WRITE_ENABLE);	shortpause();
+	GPIO_SET_0(COMMAND_LATCH_ENABLE); shortpause();
+}
+
 int send_eraseblock_command(int block)
 {
 	int i;
 
 	set_data_direction_out();
 
-	GPIO_SET_1(COMMAND_LATCH_ENABLE);
-	shortpause();
-	GPIO_SET_0(N_WRITE_ENABLE);
-	shortpause();
-	GPIO_DATA8_OUT(0x60);
-	shortpause();
-	GPIO_SET_1(N_WRITE_ENABLE);
-	shortpause();
-	GPIO_SET_0(COMMAND_LATCH_ENABLE);
-	shortpause();
+	GPIO_SET_1(COMMAND_LATCH_ENABLE); shortpause();
+	GPIO_SET_0(N_WRITE_ENABLE);	shortpause();
+	GPIO_DATA8_OUT(0x60); shortpause();
+	GPIO_SET_1(N_WRITE_ENABLE);	shortpause();
+	GPIO_SET_0(COMMAND_LATCH_ENABLE); shortpause();
 
 	GPIO_SET_1(ADDRESS_LATCH_ENABLE);
 	for (i = 2; i < 5; i++) {
@@ -617,24 +630,18 @@ int send_eraseblock_command(int block)
 		GPIO_SET_1(N_WRITE_ENABLE);
 		shortpause();
 	}
-	GPIO_SET_0(ADDRESS_LATCH_ENABLE);
-	shortpause();
+	GPIO_SET_0(ADDRESS_LATCH_ENABLE); shortpause();
 
-	GPIO_SET_1(COMMAND_LATCH_ENABLE);
-	shortpause();
-	GPIO_SET_0(N_WRITE_ENABLE);
-	shortpause();
-	GPIO_DATA8_OUT(0xD0);
-	shortpause();
-	GPIO_SET_1(N_WRITE_ENABLE);
-	shortpause();
-	GPIO_SET_0(COMMAND_LATCH_ENABLE);
-	shortpause();
-
+	GPIO_SET_1(COMMAND_LATCH_ENABLE); shortpause();
+	GPIO_SET_0(N_WRITE_ENABLE); shortpause();
+	GPIO_DATA8_OUT(0xD0); shortpause();
+	GPIO_SET_1(N_WRITE_ENABLE); shortpause();
+	
+	GPIO_SET_0(COMMAND_LATCH_ENABLE); shortpause();
 	return 0;
 }
 
-int read_status()
+INLINE int read_status()
 {
 	int data;
 	set_data_direction_out();
@@ -661,7 +668,7 @@ int read_status()
 }
 
 
-int read_pages(int first_page_number, int number_of_pages, char *outfile, int write_spare)
+INLINE int read_pages(int first_page_number, int number_of_pages, char *outfile, int write_spare)
 {
 	int page, page_no, block_no, page_nbr, percent, i, n, retry_count;
 	unsigned char id[5], id2[5];
@@ -695,13 +702,13 @@ int read_pages(int first_page_number, int number_of_pages, char *outfile, int wr
 	  retry_all:
 		page_no = page >> 1;
 
-		// printf("page = %d, n = %d\n",page, n);
+		//printf("page = %d, n = %d\n",page, n);
 
 		if (page % 2 == 0 && retry_count == 0) {
 			// page_no = page / 2;
 			page_nbr = page_no - first_page_number + 1;
 			percent = (100 * page_nbr) / number_of_pages;
-			block_no = page_no / 64;
+			block_no = page_no / PAGES_PER_BLOCK;
 			printf("Reading page n° %d in block n° %d (page %d of %d), %d%%\r", page_no, block_no, page_nbr, number_of_pages, percent);
 			fflush(stdout);
 		}
@@ -856,7 +863,7 @@ int read_pages(int first_page_number, int number_of_pages, char *outfile, int wr
 	printf("\nReading done in %f seconds\n", (float)(end - start) / CLOCKS_PER_SEC);
 }
 */
-int write_pages(int first_page_number, int number_of_pages, char *infile)
+INLINE int write_pages(int first_page_number, int number_of_pages, char *infile)
 {
 	int page, block_no, page_nbr, percent, retry_count;
 	unsigned char buf[PAGE_SIZE], id[5], id2[5];;
@@ -889,7 +896,7 @@ int write_pages(int first_page_number, int number_of_pages, char *infile)
 			// page_no = page / 2;
 			page_nbr = page - first_page_number + 1;
 			percent = (100 * page_nbr) / number_of_pages;
-			block_no = page / 64;
+			block_no = page / PAGES_PER_BLOCK;
 			printf("Writing page n° %d in block n° %d (page %d of %d), %d%%\r", page, block_no, page_nbr, number_of_pages, percent);
 			fflush(stdout);
 		}
@@ -935,7 +942,7 @@ int write_pages(int first_page_number, int number_of_pages, char *infile)
 	return 0;
 }
 
-int erase_blocks(int first_block_number, int number_of_blocks)
+INLINE int erase_blocks(int first_block_number, int number_of_blocks)
 {
 	int block, block_nbr, percent, retry_count;
 	unsigned char id[5], id2[5];
@@ -969,10 +976,10 @@ int erase_blocks(int first_block_number, int number_of_blocks)
 			goto retry;
 		}
 
-		send_eraseblock_command(block * 64); // 64 = pages per block
+		send_eraseblock_command(block * PAGES_PER_BLOCK);
 		while (GPIO_READ(N_READ_BUSY) == 0) {
 			// printf("Busy\n");
-			shortpause();
+			//shortpause();
 		}
 
 		if (read_status()) {
