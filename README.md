@@ -26,6 +26,6 @@ Flash "new" bootloader
 rpi-tsop48-nand-b3 150 write_full 3584 320 newflash-mr33.bin
 ```
 
-Then follow the instructions in the Openwrt Wiki.
+Then follow the instructions in the Openwrt Wiki. 22.03.3 is working an can be installed directly. 
 
 Inspired by https://github.com/riptidewave93/LEDE-MR33/issues/13#issuecomment-802309974
