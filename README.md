@@ -1,5 +1,5 @@
 It might be compiled on Raspberry Pi by command like
-g++ rpi-tsop48-nand.cpp -o rpi-tsop48-nand
+`g++ rpi-tsop48-nand.cpp -o rpi-tsop48-nand`
 
 Tested with Raspi 1 B V1 with 26 pin GPIO. For newer models the GPIO mapping needs to be changed.
 
