@@ -1,7 +1,7 @@
 # rpi-tsop48-nand
 Raspberry Pi / 360-Clip based 8-bit raw NAND reader
 
-rpi-tsop48-nand-v1.c
+rpi-tsop48-nand.cpp
 Raspberry Pi first gen pinout
 FRB1 : GPIO 1
 RE : GPIO 18
