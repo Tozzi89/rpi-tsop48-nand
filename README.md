@@ -1,6 +1,8 @@
 It might be compiled on Raspberry Pi by command like
 g++ rpi-tsop48-nand.cpp -o rpi-tsop48-nand
 
+Tested with Raspi 1 B V1 with 26 pin GPIO. For newer models the GPIO mapping needs to be changed.
+
 Modified for flashing MR33 NAND Spansion S34ML01G200TFV00 with old bootloader to make OpenWRT work again, see https://github.com/riptidewave93/LEDE-MR33/issues/13 and https://openwrt.org/toh/meraki/mr33
 
 Flashing was possible with NAND still soldered into MR33, 3V3 supplied through UART header. MR33 will only boot with Raspi disconnected!
