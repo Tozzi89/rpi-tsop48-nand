@@ -13,17 +13,17 @@ Download ubootmr332012.bin from https://github.com/riptidewave93/LEDE-MR33/issue
 Short instructions:
 
 Read full flash
-rpi-tsop48-nand-b3 150 read_full 0 65536 mr33_full.dmp
+rpi-tsop48-nand 150 read_full 0 65536 mr33_full.dmp
 
 Add padding for flashing
 dd if=mr33_full.dmp bs=$((0x738000)) count=1 > newflash-mr33.bin
 dd if=ubootmr332012.bin bs=132k count=5 >> newflash-mr33.bin
 
 Erase blocks
-rpi-tsop48-nand-b3 150 erase_blocks 56 5
+rpi-tsop48-nand 150 erase_blocks 56 5
 
 Flash "new" bootloader
-rpi-tsop48-nand-b3 150 write_full 3584 320 newflash-mr33.bin
+rpi-tsop48-nand 150 write_full 3584 320 newflash-mr33.bin
 ```
 
 Then follow the instructions in the OpenWRT Wiki. 22.03.3 is working and can be installed directly. 
