@@ -6,6 +6,8 @@
 
     Copyright (C) 2016  littlebalup
 
+    Modified for Rpi 1 v2 pinout.
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -51,15 +53,15 @@
 //#define BCM2736_PERI_BASE        0x3F000000
 //#define GPIO_BASE                (BCM2736_PERI_BASE + 0x200000) /* GPIO controller */
 
-#define N_WRITE_PROTECT		0 // pulled up by RPi, this is useful
-#define N_READ_BUSY		1 // pulled up by RPi, this is also useful
+#define N_WRITE_PROTECT		2 // pulled up by RPi, this is useful
+#define N_READ_BUSY		3 // pulled up by RPi, this is also useful
 
 // rest of GPIOs have been chose arbitrarily, with the only constraint of not using
 // GPIO 14 (TXD)/GPIO 15 (RXD)/06 (GND) on P1. instead I use GND on P2 header, pin 8
 
 // IMPORTANT: BE VERY CAREFUL TO CONNECT VCC TO P1-01 (3.3V) AND *NOT* P1-02 (5V) !!
 
-#define N_WRITE_ENABLE 		21
+#define N_WRITE_ENABLE 		27
 #define ADDRESS_LATCH_ENABLE	4
 #define COMMAND_LATCH_ENABLE	17
 #define N_READ_ENABLE		18
